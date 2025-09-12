@@ -13,7 +13,32 @@ Masalan:
 
 Promise → faqat bitta natija qaytaradi.
 
+Observable nima?
+
+Observable — bu ma’lumot oqimini (stream) ifodalovchi obyekt.
+
+U vaqt davomida 0, 1 yoki cheksiz qiymat yuborishi mumkin.
+
+Observable’ni olish uchun subscribe qilinadi.
+
 Observable → cheksiz oqim bo‘lishi mumkin (masalan, chat xabarlari, tugma bosilishi, real-time API).
+
+import { Observable } from 'rxjs';
+
+const observable = new Observable(subscriber => {
+  subscriber.next("1-qiymat");
+  subscriber.next("2-qiymat");
+  setTimeout(() => {
+    subscriber.next("3-qiymat (kechikib keldi)");
+    subscriber.complete(); // oqim tugadi
+  }, 2000);
+});
+
+observable.subscribe({
+  next: (data) => console.log("Keldi:", data),
+  complete: () => console.log("Oqim tugadi")
+});
+Bu radio signalga o‘xshaydi: signal yuboriladi, sen uni tinglaysan.
 
 
 📌 RxJS qayerda ishlatiladi?
@@ -77,3 +102,368 @@ Asinxron kodni boshqarish oson bo‘ladi (callback hell yo‘qoladi).
 Ko‘p oqimlarni birlashtirish mumkin (masalan, bir nechta API so‘rovlarini ketma-ket yoki parallel boshqarish).
 Eventlarni boshqarish qulay (kliklar, form inputlari, WebSocket ma’lumotlari).
 Real-time ilovalar yaratish uchun juda kuchli vosita.
+
+
+
+3️⃣ Operators nima?
+
+Operators — bu oqimdagi ma’lumotlarni transformatsiya, filterlash, kombinatsiya
+qilish uchun ishlatiladigan funksiyalar.
+
+Ular .pipe() ichida qo‘llanadi.
+
+Eng mashhur operatorlar:
+
+map → qiymatni o‘zgartiradi.
+filter → shartga mos bo‘lganlarini o‘tkazadi
+take → faqat bir necha qiymatni oladi.
+debounceTime → foydalanuvchi yozib bo‘lgach kutadi.
+switchMap → yangi oqimga o‘tadi, eski oqimni bekor qiladi.
+
+import { from } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
+
+from([1, 2, 3, 4, 5, 6])
+  .pipe(
+    filter(n => n % 2 === 0), // faqat juftlar
+    map(n => n * 10)          // har birini 10 ga ko‘paytirish
+  )
+  .subscribe(result => console.log("Natija:", result));
+
+Natija
+
+Natija: 20
+Natija: 40
+Natija: 60
+
+
+1️⃣ tap()
+
+tap — bu oqimdagi qiymatlarni o‘zgartirmasdan, yon ta’sir (side effect)
+ bajarish uchun ishlatiladigan operator.
+
+U odatda
+
+console.log qilish,
+Debug qilish,
+Qo‘shimcha funksiya chaqirish uchun ishlatiladi.
+
+Muhim: tap oqimdagi qiymatni o‘zgartirmaydi, faqat “orasida kuzatib o‘tadi”.
+
+import { of } from 'rxjs';
+import { tap, map } from 'rxjs/operators';
+
+of(1, 2, 3, 4)
+  .pipe(
+    tap(x => console.log('Kelgan qiymat:', x)), // faqat console.log
+    map(x => x * 10) // qiymatni o‘zgartirish
+  )
+  .subscribe(result => console.log("Natija:", result));
+
+Natija
+
+Kelgan qiymat: 1
+Natija: 10
+Kelgan qiymat: 2
+Natija: 20
+Kelgan qiymat: 3
+Natija: 30
+Kelgan qiymat: 4
+Natija: 40
+
+
+2️⃣ shareReplay()
+
+shareReplay — bu oqimni bo‘lishish va kechiktirib ulanish (caching) uchun ishlatiladigan operator.
+
+U nima qiladi?
+
+Observable bitta marta ishlaydi, lekin bir nechta subscriber buni qayta-qayta ishlatishi mumkin.
+Oxirgi N ta qiymatni eslab qoladi va yangi subscriber kelganda ularni darhol beradi.
+
+Asosan ishlatiladi:
+
+HttpClient so‘rovlarini qayta yubormaslik uchun.
+Bir nechta subscriber bitta oqimni ishlatishi kerak bo‘lsa.
+
+Misol (caching API):
+
+import { of } from 'rxjs';
+import { delay, shareReplay } from 'rxjs/operators';
+
+const apiCall$ = of("Serverdan data")
+  .pipe(
+    delay(2000),       // API kechikishi
+    shareReplay(1)     // Oxirgi 1 qiymatni cache qiladi
+  );
+
+// 1-subscriber
+apiCall$.subscribe(data => console.log("Subscriber 1:", data));
+
+// 2 sekunddan keyin 2-subscriber
+setTimeout(() => {
+  apiCall$.subscribe(data => console.log("Subscriber 2:", data));
+}, 3000);
+
+Natija:
+
+
+(2 sekundan keyin)
+Subscriber 1: Serverdan data
+Subscriber 2: Serverdan data   (yana 2 sekund kutmaydi!)
+
+Xulosa:
+
+tap → Yon ta’sirlar uchun (console.log, analytics, debugging). Oqim qiymatini o‘zgartirmaydi.
+shareReplay → Oqimni bir nechta subscriber bilan ulashadi va oxirgi qiymatlarni eslab qoladi (API caching).
+
+
+
+
+4️⃣ Subject nima?
+
+Subject — bu Observable + Observer aralashmasi.
+
+U ham ma’lumot yuboruvchi (producer), ham qabul qiluvchi (consumer).
+
+Observable’dan farqi: bir nechta subscriber bir xil oqimni oladi (broadcast).
+
+
+import { Subject } from 'rxjs';
+
+const subject = new Subject<number>();
+
+// 2 ta subscriber
+subject.subscribe(value => console.log("Subscriber 1:", value));
+subject.subscribe(value => console.log("Subscriber 2:", value));
+
+// Ma’lumot yuborish
+subject.next(100);
+subject.next(200);
+
+Natija:
+
+Subscriber 1: 100
+Subscriber 2: 100
+Subscriber 1: 200
+Subscriber 2: 200
+
+Oddiy Observable’da har bir subscriber alohida oqim oladi, Subject’da esa hamma bir xil oqimni oladi.
+
+
+
+Xulosa:
+
+RxJS → reaktiv dasturlash kutubxonasi, oqimlar bilan ishlash uchun.
+Observable → oqimni ifodalaydi, subscribe orqali ma’lumot olinadi.
+Operators → oqimni boshqarish va o‘zgartirish imkonini beradi.
+Subject → broadcast qiluvchi oqim, bir nechta kuzatuvchilar bilan ishlaydi.
+
+
+
+Subject va uning turlari:
+
+Subject: Observable ham, Observer ham — .next() qilsa barcha subscriber’larga yuboradi (broadcast).
+
+1️⃣ Subject ->
+
+Oddiy Subject — bu Observable + Observer aralashmasi.
+Har bir subscriber faqat undan keyin keladigan qiymatlarni oladi.
+Oldin yuborilgan qiymatlar yangi subscriber’ga berilmaydi.
+
+
+import { Subject } from 'rxjs';
+
+const subject = new Subject<number>();
+
+subject.subscribe(v => console.log("Subscriber 1:", v));
+
+subject.next(1);
+subject.next(2);
+
+subject.subscribe(v => console.log("Subscriber 2:", v));
+
+subject.next(3);
+
+👉 Natija:
+
+Subscriber 1: 1
+Subscriber 1: 2
+Subscriber 1: 3
+Subscriber 2: 3
+
+faqat keyingi qiymatlarni beradi.
+
+
+BehaviorSubject: boshlang‘ich qiymatga ega, yangi subscriber oxirgi qiymatni oladi.
+
+2️⃣ BehaviorSubject ->
+
+BehaviorSubject — bu oxirgi qiymatni eslab qoladigan Subject.
+Yangi subscriber kelganda darhol oxirgi qiymatni beradi.
+Har doim biron-bir qiymatga ega bo‘lishi kerak (default qiymat bilan boshlanadi).
+
+
+import { BehaviorSubject } from 'rxjs';
+
+const behavior = new BehaviorSubject<number>(0); // boshlang'ich qiymat 0
+
+behavior.subscribe(v => console.log("Subscriber 1:", v));
+
+behavior.next(1);
+behavior.next(2);
+
+behavior.subscribe(v => console.log("Subscriber 2:", v));
+
+behavior.next(3);
+
+👉 Natija:
+
+Subscriber 1: 0
+Subscriber 1: 1
+Subscriber 1: 2
+Subscriber 2: 2
+Subscriber 1: 3
+Subscriber 2: 3
+
+yangi subscriber oxirgi qiymatni ko‘radi.
+
+
+
+ReplaySubject: oxirgi N yoki vaqt bo‘yicha qiymatlarni saqlaydi va yangi subscriber’ga qaytaradi.
+
+3️⃣ ReplaySubject ->
+
+👉 ReplaySubject — bu N ta eski qiymatni eslab qoladigan Subject.
+Yangi subscriber kelganda oxirgi N ta qiymatni qayta o‘ynaydi (replay).
+
+import { ReplaySubject } from 'rxjs';
+
+const replay = new ReplaySubject<number>(2); // oxirgi 2 ta qiymatni saqlaydi
+
+replay.subscribe(v => console.log("Subscriber 1:", v));
+
+replay.next(1);
+replay.next(2);
+replay.next(3);
+
+replay.subscribe(v => console.log("Subscriber 2:", v));
+
+replay.next(4);
+
+👉 Natija:
+
+
+Subscriber 1: 1
+Subscriber 1: 2
+Subscriber 1: 3
+Subscriber 2: 2
+Subscriber 2: 3
+Subscriber 1: 4
+Subscriber 2: 4
+
+yangi subscriber oxirgi N qiymatni oladi.
+
+
+AsyncSubject: faqat complete() qilingach, oxirgi qiymatni tarqatadi.
+
+4️⃣ AsyncSubject ->
+
+👉 AsyncSubject — bu faqat oxirgi qiymatni oqim tugaganda (complete()) beradi.
+next chaqirilgan qiymatlar saqlanadi, lekin subscriber’ga berilmaydi.
+Faqat complete() bo‘lganda oxirgi qiymat chiqariladi.
+
+import { AsyncSubject } from 'rxjs';
+
+const asyncSub = new AsyncSubject<number>();
+
+asyncSub.subscribe(v => console.log("Subscriber 1:", v));
+
+asyncSub.next(1);
+asyncSub.next(2);
+asyncSub.next(3);
+
+asyncSub.subscribe(v => console.log("Subscriber 2:", v));
+
+asyncSub.complete(); // endi chiqaradi
+
+👉 Natija:
+
+Subscriber 1: 3
+Subscriber 2: 3
+
+faqat oxirgi qiymatni oqim tugaganda beradi.
+
+
+1️⃣ Flattening operatorlari:
+
+1️⃣ mergeMap ->
+
+Har bir ichki Observable’ni parallel ravishda ishga tushiradi.
+Hech qaysi oqimni bekor qilmaydi, hammasini birlashtirib yuboradi.
+
+
+import { of } from 'rxjs';
+import { mergeMap, delay } from 'rxjs/operators';
+
+of(1, 2, 3)
+  .pipe(
+    mergeMap(x => of(`Qiymat ${x}`).pipe(delay(1000)))
+  )
+  .subscribe(console.log);
+
+Natija (hammasi bitta vaqtda tugaydi, tartib kafolatlanmagan):
+
+Qiymat 1
+Qiymat 2
+Qiymat 3
+
+
+2️⃣ concatMap ->
+
+Har bir oqimni navbat bilan ishlatadi.
+Bittasi tugamaguncha keyingisini boshlamaydi.
+
+of(1, 2, 3)
+  .pipe(
+    concatMap(x => of(`Qiymat ${x}`).pipe(delay(1000)))
+  )
+  .subscribe(console.log);
+
+Natija (tartib saqlanadi, ketma-ket ishlaydi):
+
+Qiymat 1
+Qiymat 2
+Qiymat 3
+
+
+3️⃣ switchMap ->
+
+Yangi oqim kelganda eski oqimni bekor qiladi.
+Faqat oxirgi so‘rovning natijasini oladi.
+
+import { interval } from 'rxjs';
+import { switchMap, take } from 'rxjs/operators';
+
+interval(1000).pipe(
+  take(3),
+  switchMap(x => of(`So‘rov: ${x}`).pipe(delay(1500)))
+).subscribe(console.log);
+
+Natija: faqat eng oxirgi observable natijasi chiqadi.
+
+
+4️⃣ exhaustMap ->
+
+Agar oqim ishlayotgan bo‘lsa, yangi kelganlarini e’tiborsiz qoldiradi.
+Faqat bitta oqim ishlashi mumkin.
+
+import { interval } from 'rxjs';
+import { exhaustMap, take } from 'rxjs/operators';
+
+interval(500).pipe(
+  take(5),
+  exhaustMap(x => of(`So‘rov: ${x}`).pipe(delay(1000)))
+).subscribe(console.log);
+
+Natija: Faqat birinchi kelganini bajaradi, qolganlari bekor qilinadi.
