@@ -8,7 +8,7 @@ import { StudentCoursesComponent } from "./student-courses/student-courses.compo
     imports: [StudentCoursesComponent]
 })
 
-export class StudentsComponent implements OnInit {
+export default class StudentsComponent implements OnInit {
     constructor() { }
 
     ngOnInit() { }
